@@ -1,61 +1,104 @@
 'use client';
 
+import Header from '@/components/Header';
 import { places } from '@/data/places';
-import { useRouter } from 'next/navigation';
-import React, { use } from 'react'; // Import use from react
+import { use } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { useEffect, useRef, useState } from 'react';
+
+// Your Mapbox token
+mapboxgl.accessToken = 'pk.eyJ1Ijoic2FtbXkwMTAiLCJhIjoiY21qeW93NnFzNXdhcDNncXhhaDc2bnBnaiJ9.8WCyIGn5poxEjWkSQ2HEPg';
 
 export default function PlaceDetail({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params); // Properly unwrap the Promise
+  const { id } = use(params);
   const place = places.find((p) => p.id === id);
+  if (!place) return <p className="text-center pt-20 text-2xl">Place not found</p>;
 
-  const router = useRouter();
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  if (!place) {
-    return (
-      <div className="min-h-screen pt-20 text-center">
-        <p className="text-2xl">Place not found</p>
-        <button onClick={() => router.back()} className="mt-4 text-blue-600 underline">
-          Go back
-        </button>
-      </div>
-    );
-  }
-
-  const handleDirections = () => {
+  const loadDirections = () => {
+    setLoading(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const userLat = position.coords.latitude;
-          const userLng = position.coords.longitude;
-          const destLat = place.location.lat;
-          const destLng = place.location.lng;
-          // Opens in Google Maps (works perfectly on mobile & desktop)
-          window.open(
-            `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${destLat},${destLng}&travelmode=driving`
-          );
+          const lng = position.coords.longitude;
+          const lat = position.coords.latitude;
+          setUserLocation([lng, lat]);
+          setShowMap(true);
+          setLoading(false);
         },
         () => {
-          alert('Location access denied. Opening map to the place directly.');
-          window.open(
-            `https://www.google.com/maps/search/?api=1&query=${place.location.lat},${place.location.lng}`
-          );
+          alert('Location access denied. Map centered on the place.');
+          setShowMap(true);
+          setLoading(false);
         }
       );
     } else {
-      // Fallback if geolocation not supported
-      window.open(`https://www.google.com/maps/search/?api=1&query=${place.name}+Lagos`);
+      setShowMap(true);
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (!showMap || !mapContainer.current) return;
+
+    if (map.current) map.current.remove();
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: userLocation || [place.location.lng, place.location.lat],
+      zoom: userLocation ? 13 : 15,
+    });
+
+    // User's location marker
+    if (userLocation) {
+      new mapboxgl.Marker({ color: '#00ff00' })
+        .setLngLat(userLocation)
+        .setPopup(new mapboxgl.Popup().setHTML('<h3 class="font-bold">You are here</h3>'))
+        .addTo(map.current!);
+    }
+
+    // Place marker
+    new mapboxgl.Marker({ color: '#0000ff' })
+      .setLngLat([place.location.lng, place.location.lat])
+      .setPopup(new mapboxgl.Popup().setHTML(`<h3 class="font-bold">${place.name}</h3>`))
+      .addTo(map.current!);
+
+    // Draw route if user location available
+    if (userLocation) {
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${userLocation[0]},${userLocation[1]};${place.location.lng},${place.location.lat}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          const route = data.routes[0].geometry;
+          map.current!.addSource('route', {
+            type: 'geojson',
+            data: route
+          });
+          map.current!.addLayer({
+            id: 'route',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#3887be', 'line-width': 6 }
+          });
+        });
+    }
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  }, [showMap, userLocation, place]);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Image */}
+      <Header />
       <div className="relative h-96 md:h-screen max-h-96 overflow-hidden">
-        <img
-          src={place.image}
-          alt={place.name}
-          className="w-full h-full object-cover"
-        />
+        <img src={place.image} alt={place.name} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-8 left-8 text-white">
           <h1 className="text-4xl md:text-6xl font-bold drop-shadow-2xl">{place.name}</h1>
@@ -63,7 +106,7 @@ export default function PlaceDetail({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
-      {/* Details Content */}
+       {/* Details Content */}
       <div className="max-w-4xl mx-auto px-4 py-12 -mt-20 relative z-10">
         <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12">
           <section className="mb-10">
@@ -124,15 +167,22 @@ export default function PlaceDetail({ params }: { params: Promise<{ id: string }
             </div>
           </section>
 
-          {/* Use Map Button */}
-          <div className="text-center">
+          {/* Directions Button + Embedded Map */}
+          <div className="mt-12 text-center">
             <button
-              onClick={handleDirections}
-              className="px-10 py-5 bg-blue-600 text-white text-xl font-bold rounded-full shadow-lg hover:bg-blue-700 transition transform hover:scale-105"
+              onClick={loadDirections}
+              disabled={loading}
+              className="px-10 py-5 bg-blue-600 text-white text-xl font-bold rounded-full shadow-lg hover:bg-blue-700 transition transform hover:scale-105 disabled:opacity-50"
             >
-              Use Map for Directions from My Location
+              {loading ? 'Loading map...' : 'Show Map & Directions'}
             </button>
           </div>
+
+          {showMap && (
+            <div className="mt-8 rounded-xl overflow-hidden shadow-2xl">
+              <div ref={mapContainer} className="w-full h-96 md:h-screen max-h-96" />
+            </div>
+          )}
         </div>
       </div>
     </div>
