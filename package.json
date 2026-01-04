@@ -9,6 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "body-parser": "^2.2.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "firebase-admin": "^13.6.0",
+    "jsonwebtoken": "^9.0.3",
     "mapbox-gl": "^3.17.0",
     "next": "16.1.1",
     "react": "19.2.3",
@@ -24,5 +30,18 @@
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "description": "This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/psalmy-el/naijafind.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/psalmy-el/naijafind/issues"
+  },
+  "homepage": "https://github.com/psalmy-el/naijafind#readme"
 }

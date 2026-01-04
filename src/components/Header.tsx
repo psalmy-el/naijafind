@@ -2,34 +2,34 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; // For search navigation
+import { useRouter } from 'next/navigation';
 import { places } from '@/data/places';
 
 export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showServices, setShowServices] = useState(false); // For dropdown
+  const [showServices, setShowServices] = useState(false);
   const router = useRouter();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery) {
-      router.push(`/search?query=${encodeURIComponent(searchQuery)}`);
+    if (searchQuery.trim()) {
+      router.push(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
       setShowSuggestions(false);
     }
   };
 
-  // Suggestions list (from places, locations, services – expand as you add data)
-  const suggestions = [
-    ...places.map(p => p.name), // Names
-    ...places.map(p => p.address.split(', ')[0]), // Locations like 'Lekki'
-    ...places.flatMap(p => p.services), // Services like 'Dine-in'
-    'Food', 'Hotel', 'Barber', 'Tailoring', 'Carpentry', 'Catering', // Categories
-  ].filter((value, index, self) => self.indexOf(value) === index); // Unique
+  const suggestions = Array.from(new Set([
+    ...places.map(p => p.name),
+    ...places.map(p => p.address),
+    ...places.flatMap(p => p.services),
+    ...places.map(p => p.category),
+  ]));
 
-  const filteredSuggestions = suggestions.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredSuggestions = suggestions.filter(s =>
+    s.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  // Comprehensive Nigerian services list for dropdown
   const servicesList = [
     { name: 'Food & Restaurants', link: '/search?service=Food' },
     { name: 'Hotels & Accommodation', link: '/search?service=Hotel' },
@@ -50,16 +50,17 @@ export default function Header() {
     { name: 'Phone & Electronics Repair', link: '/search?service=Phone Repair' },
     { name: 'Banking & Financial Services', link: '/search?service=Banking' },
     { name: 'Legal & Consulting', link: '/search?service=Legal' },
-    // Add more as needed – covers daily/tourist needs in Nigeria
   ];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-transparent py-4">
       <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="text-3xl font-bold text-white drop-shadow-lg">NaijaFind</Link>
+        <Link href="/" className="text-3xl font-bold text-white drop-shadow-lg">
+          NaijaFind
+        </Link>
 
-        {/* Search Bar with Dropdown Suggestions */}
+        {/* Search */}
         <div className="relative flex-1 max-w-lg mx-8">
           <form onSubmit={handleSearch}>
             <input
@@ -74,17 +75,18 @@ export default function Header() {
               className="w-full px-6 py-3 rounded-full bg-white text-gray-800 focus:outline-none shadow-lg"
             />
           </form>
+
           {showSuggestions && filteredSuggestions.length > 0 && (
-            <div className="absolute w-full mt-2 bg-white rounded-lg shadow-xl max-h-60 overflow-y-auto z-50">
-              {filteredSuggestions.map((sug, index) => (
+            <div className="absolute w-full mt-2 bg-white rounded-lg shadow-2xl max-h-60 overflow-y-auto z-50 border border-gray-200">
+              {filteredSuggestions.map((sug, i) => (
                 <div
-                  key={index}
+                  key={i}
                   onClick={() => {
                     setSearchQuery(sug);
                     setShowSuggestions(false);
                     router.push(`/search?query=${encodeURIComponent(sug)}`);
                   }}
-                  className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                  className="px-6 py-3 hover:bg-gray-100 cursor-pointer text-black text-lg border-b border-gray-100 last:border-0"
                 >
                   {sug}
                 </div>
@@ -93,22 +95,27 @@ export default function Header() {
           )}
         </div>
 
-        {/* Nav with Services Dropdown */}
-        <nav className="flex gap-6 text-lg">
+        {/* Nav with Auth */}
+        <nav className="flex gap-6 text-lg items-center">
           <Link href="/" className="text-white hover:underline drop-shadow">Home</Link>
           <Link href="/about" className="text-white hover:underline drop-shadow">About</Link>
-          <div className="relative"
-            onMouseEnter={() => setShowServices(true)}
-            onMouseLeave={() => setShowServices(false)}
-          >
-            <button className="text-white hover:underline drop-shadow">Services</button>
+
+          {/* Services Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowServices(!showServices)}
+              className="text-white hover:underline drop-shadow"
+            >
+              Services
+            </button>
             {showServices && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl max-h-80 overflow-y-auto z-50">
-                {servicesList.map((service, index) => (
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-2xl max-h-96 overflow-y-auto z-50">
+                {servicesList.map((service, i) => (
                   <Link
-                    key={index}
+                    key={i}
                     href={service.link}
-                    className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
+                    onClick={() => setShowServices(false)}
+                    className="block px-6 py-3 text-gray-800 hover:bg-gray-100 border-b border-gray-100 last:border-0"
                   >
                     {service.name}
                   </Link>
@@ -116,8 +123,26 @@ export default function Header() {
               </div>
             )}
           </div>
-          <Link href="/filter" className="text-white hover:underline drop-shadow">Filter</Link>
+
           <Link href="/contact" className="text-white hover:underline drop-shadow">Contact</Link>
+
+          {/* Auth Section */}
+          {typeof window !== 'undefined' && localStorage.getItem('token') ? (
+            <button
+              onClick={() => {
+                localStorage.removeItem('token');
+                router.push('/');
+              }}
+              className="text-white hover:underline drop-shadow"
+            >
+              Logout
+            </button>
+          ) : (
+            <>
+              <Link href="/login" className="text-white hover:underline drop-shadow">Login</Link>
+              <Link href="/signup" className="text-white hover:underline drop-shadow">Sign Up</Link>
+            </>
+          )}
         </nav>
       </div>
     </header>
